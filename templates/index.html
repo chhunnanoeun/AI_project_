@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat with PDF</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .drop-area {
+            width: 100%;
+            height: 200px;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        
+        .drop-area.active {
+            border-color: #007bff;
+        }
+        
+        #messages {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: scroll;
+        }
+        
+        .chat-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        .chat-button {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Chat with PDF</h1>
+    <div class="drop-area" id="drop-area">
+        <p>Drop a PDF file here or click to browse</p>
+    </div>
+    <div id="messages">
+        <p>Welcome! Drop a PDF file above to start.</p>
+    </div>
+    <input type="text" id="question" class="chat-input" placeholder="Type your question...">
+    <button onclick="askQuestion()" class="chat-button">Ask</button>
+
+    <script>
+        const dropArea = document.getElementById('drop-area');
+        const messagesDiv = document.getElementById('messages');
+        const questionInput = document.getElementById('question');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight() {
+            dropArea.classList.add('active');
+        }
+
+        function unhighlight() {
+            dropArea.classList.remove('active');
+        }
+
+        dropArea.addEventListener('drop', handleDrop, false);
+
+        async function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+
+            await handleFiles(files);
+        }
+
+        async function handleFiles(files) {
+            const formData = new FormData();
+            formData.append('file', files[0]);
+
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            displayMessage(result.message);
+            localStorage.setItem('filename', result.filename);
+        }
+
+        function displayMessage(message) {
+            const messageElement = document.createElement('p');
+            messageElement.textContent = message;
+            messagesDiv.appendChild(messageElement);
+        }
+
+        async function askQuestion() {
+            const question = questionInput.value.trim();
+            if (!question) return;
+
+            const filename = localStorage.getItem('filename');
+            const response = await fetch('/chatbot', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    question,
+                    filename
+                })
+            });
+
+            const result = await response.json();
+            displayMessage(`You: ${question}`);
+            displayMessage(`Chatbot: ${result.answer}`);
+
+
+            questionInput.value = '';
+        }
+    </script>
+</body>
+
+</html>
